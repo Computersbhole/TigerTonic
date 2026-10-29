@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HACCP Log</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="HACCP Log">
+<style>
+:root{--bg:#faf7f2;--card:#fff;--tx:#1f1a17;--mu:#6b625b;--ac:#b4232a;--bd:#e4ddd3;--ok:#1f7a3d;--bad:#c62828;--badbg:#fdecea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171412;--card:#221e1b;--tx:#f1ebe4;--mu:#a39a91;--ac:#ef6a6f;--bd:#383230;--ok:#5cc47e;--bad:#ff8a80;--badbg:#3a1f1d;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171412;--card:#221e1b;--tx:#f1ebe4;--mu:#a39a91;--ac:#ef6a6f;--bd:#383230;--ok:#5cc47e;--bad:#ff8a80;--badbg:#3a1f1d;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,system-ui,Segoe UI,sans-serif}
+main{max-width:640px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:20px;margin:4px 0 2px}.sub{color:var(--mu);font-size:13px;margin-bottom:10px}
+nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+nav button{flex:none;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:18px;padding:7px 12px;font-size:14px}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin:10px 0}
+h2{font-size:17px;margin:0 0 2px}.lim{color:var(--ac);font-size:13px;font-weight:600;margin-bottom:8px}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
+input,select,textarea{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+.btn{background:var(--ac);color:#fff;border:0;border-radius:10px;padding:12px;font-size:16px;font-weight:600;width:100%;margin-top:14px}
+.btn.s{background:var(--card);color:var(--tx);border:1px solid var(--bd);margin-top:8px}
+.warn{background:var(--badbg);color:var(--bad);border-radius:8px;padding:8px 10px;margin-top:10px;font-size:14px;display:none}
+.row{border-top:1px solid var(--bd);padding:9px 0;font-size:14px}.row:first-child{border-top:0}
+.row.f{background:var(--badbg);margin:0 -8px;padding:9px 8px;border-radius:8px}
+.row b{font-size:13px}.mu{color:var(--mu)}.flag{color:var(--bad);font-weight:700}
+textarea.sum{height:240px;font:12px/1.4 ui-monospace,monospace}
+.msg{color:var(--ok);font-size:14px;margin-top:8px;min-height:18px}
+.pv{max-width:100%;max-height:220px;border-radius:8px;margin-top:8px;display:block}.th{width:48px;height:48px;object-fit:cover;border-radius:6px;float:right;margin-left:8px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body><main>
+<h1>Tiger Tonic Production Log</h1>
+<div class="sub" id="mode"></div>
+<nav id="nav"></nav><div id="view"></div>
+</main>
+<script>
+// 1) Paste your Supabase values here (Project Settings > API). The public key is safe to include; the database rules protect your data.
+const SUPABASE_URL='PASTE_PROJECT_URL_HERE',SUPABASE_KEY='PASTE_PUBLIC_ANON_KEY_HERE';
+const $=s=>document.querySelector(s);
+const e=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toLocaleDateString('en-CA');
+const now=()=>new Date().toTimeString().slice(0,5);
+const D=['date','Date','date'],T=['time','Time','time'],B=['batch','Batch #','text'];
+const BY=l=>['by',l||'Checked by','text'],N=['notes','Notes','textarea'];
+const YN=(k,l,bad)=>[k,l,'yn',{bad:bad||'N'}];
+const LOGS=[
+{id:'ph',n:'pH (CCP)',t:'Kvass pH monitoring',lim:'Critical limit: pH ≤ 4.2',ca:'notes',f:[D,T,B,['ph','pH reading','number',{step:.01,bad:v=>v>4.2,msg:'pH above 4.2'}],YN('cal','Calibration verified'),BY('Measured by'),['notes','Notes / corrective action','textarea']]},
+{id:'p1',n:'Primary ferment',t:'Primary fermentation temperature',f:[D,B,T,['temp','Ambient temp (°F)','number',{step:.1}],BY(),N]},
+{id:'p2',n:'Secondary ferment',t:'Secondary fermentation temperature',f:[D,B,T,['dur','Duration','text'],['temp','Ambient temp (°F)','number',{step:.1}],BY(),N]},
+{id:'cold',n:'Cold hold (CCP)',t:'Refrigerated storage temperature',lim:'Critical limit: ≤ 41°F (5°C)',ca:'ca',f:[D,T,['unit','Storage unit ID','text'],['temp','Temp (°F)','number',{step:.1,bad:v=>v>41,msg:'Temp above 41°F'}],BY(),['ca','Corrective action','textarea']]},
+{id:'bot',n:'Bottling',t:'Bottling & post-fermentation',f:[D,T,B,['ph','pH at bottling','number',{step:.01,bad:v=>v>4.2,msg:'pH above 4.2'}],['count','# bottles filled','number',{step:1}],YN('san','Sanitation verified'),BY('Bottled by'),N],ca:'notes'},
+{id:'san',n:'Sanitation',t:'Sanitation log',lim:'Clean and sanitize before and after production',ca:'ca',f:[D,T,['sanitizer','Sanitizer used','text'],YN('rinsed','Rinsed?','N'),BY(),['ca','Corrective action','textarea']]},
+{id:'ca',n:'Corrective actions',t:'Corrective action & disposition',f:[D,['batch','Batch / lot #','text'],['dev','Deviation description','textarea'],['act','Action taken','textarea'],['disp','Final disposition','text'],BY('Reviewed by')]},
+{id:'in',n:'Produce intake',t:'Produce intake',f:[D,['prod','Products purchased','text'],['src','Source','text'],['qty','Quantity','text'],YN('ok','Acceptable quality?','N'),['ca','Corrective actions','textarea']],ca:'ca'}
+];
+let rows=[],sb=null,user=null,tab='ph',S={},urls={};
+try{S=JSON.parse(localStorage.getItem('tt')||'{}')}catch(_){}
+const save=()=>{try{localStorage.setItem('tt',JSON.stringify(S))}catch(_){}};
+const isBad=(f,v)=>{const o=f[3]||{};if(v===''||v==null)return false;return f[2]==='yn'?v===o.bad:o.bad&&f[2]==='number'?o.bad(+v):false};
+const flags=(L,r)=>L.f.filter(f=>isBad(f,r[f[0]])).map(f=>f[2]==='yn'?f[1]+' = '+r[f[0]]:(f[3].msg||f[1]));
+function nav(){$('#nav').innerHTML=LOGS.concat([{id:'exp',n:'Receipts'},{id:'rec',n:'Records & email'}]).map(l=>`<button class="${tab===l.id?'on':''}" onclick="go('${l.id}')">${e(l.n)}</button>`).join('')}
+function go(t){tab=t;render()}
+function fld(f,L){const[k,l,t]=f,id='f_'+k;let v='';
+ if(t==='date')v=today();if(t==='time')v=now();if(k==='by'&&S.name)v=S.name;
+ const inp=t==='textarea'?`<textarea id="${id}" rows="2"></textarea>`:t==='yn'?`<select id="${id}"><option value="">Select…</option><option>Y</option><option>N</option></select>`:`<input id="${id}" type="${t==='number'?'number':t}" ${t==='number'?'inputmode="decimal" step="'+((f[3]||{}).step||'any')+'"':''} value="${e(v)}">`;
+ return `<label for="${id}">${e(l)}</label>${inp}`}
+function render(){if(!user)return loginView();nav();$('#mode').innerHTML='Signed in as '+e(user.email)+' · <a href="#" onclick="signOut();return false" style="color:var(--ac)">Sign out</a>';
+ const v=$('#view');if(tab==='rec')return recs(v);if(tab==='exp')return exp(v);
+ const L=LOGS.find(x=>x.id===tab),list=rows.filter(r=>r.log===tab).sort((a,b)=>b.ts-a.ts).slice(0,40);
+ v.innerHTML=`<div class="card"><h2>${e(L.t)}</h2>${L.lim?`<div class="lim">${e(L.lim)}</div>`:''}${L.f.map(f=>fld(f,L)).join('')}
+ <div class="warn" id="warn"></div><button class="btn" onclick="submit()">Save entry</button><div class="msg" id="msg"></div></div>
+ <div class="card"><h2>Recent entries</h2>${list.length?list.map(r=>row(L,r)).join(''):'<div class="mu">No entries yet.</div>'}</div>`;
+ L.f.forEach(f=>{const el=$('#f_'+f[0]);if(el&&f[2]!=='textarea')el.oninput=chk})}
+function row(L,r){const fl=flags(L,r);return `<div class="row ${fl.length?'f':''}"><b>${e(r.date||'')} ${e(r.time||'')}</b> ${fl.length?'<span class="flag">OUT OF LIMIT</span>':''}<br>${L.f.filter(f=>!['date','time'].includes(f[0])&&r[f[0]]).map(f=>`<span class="mu">${e(f[1])}:</span> ${e(r[f[0]])}`).join(' · ')}</div>`}
+function read(L){const r={};L.f.forEach(f=>r[f[0]]=($('#f_'+f[0]).value||'').trim());return r}
+function chk(){const L=LOGS.find(x=>x.id===tab),fl=flags(L,read(L)),w=$('#warn');
+ w.style.display=fl.length?'block':'none';w.textContent=fl.length?'Out of limit: '+fl.join('; ')+'. Describe the corrective action in the notes field, then log it under Corrective actions.':''}
+async function submit(){const L=LOGS.find(x=>x.id===tab),r=read(L),m=$('#msg');
+ if(!r.date){m.textContent='Date is required.';return}
+ if(flags(L,r).length&&L.ca&&!r[L.ca]){chk();m.textContent='Add a corrective action before saving.';m.style.color='var(--bad)';$('#f_'+L.ca).focus();return}
+ if(r.by){S.name=r.by;save()}
+ try{await add(tab,r);render();$('#msg').textContent='Saved.'}catch(x){m.style.color='var(--bad)';m.textContent='Could not save: '+(x.message||x.code)}}
+function summary(day){let o=`TIGER TONIC HACCP RECORD SUMMARY\nDate: ${day}\n`;let n=0;
+ LOGS.forEach(L=>{const l=rows.filter(r=>r.log===L.id&&r.date===day).sort((a,b)=>a.ts-b.ts);if(!l.length)return;
+  o+=`\n== ${L.t} ==\n`;l.forEach(r=>{n++;const fl=flags(L,r);o+=`- ${r.time||''} `+L.f.filter(f=>!['date','time'].includes(f[0])&&r[f[0]]).map(f=>f[1]+': '+r[f[0]]).join('; ')+(fl.length?'  [OUT OF LIMIT: '+fl.join(', ')+']':'')+'\n'})});
+ return n?o:o+'\nNo entries logged for this date.\n'}
+function recs(v){const day=S.day||today();
+ v.innerHTML=`<div class="card"><h2>Summary</h2><label for="cat">Record type</label><select id="cat"><option value="h">Inspection records (one day)</option><option value="x">Expenses (whole month)</option></select><label for="day">Date</label><input type="date" id="day" value="${day}">
+ <label for="to">Records inbox address</label><input type="email" id="to" value="${e(S.to||'')}" placeholder="records@example.com">
+ <label for="sum">Summary</label><textarea class="sum" id="sum" readonly></textarea>
+ <button class="btn" onclick="mail()">Email this summary</button>
+ <button class="btn s" onclick="copy()">Copy text</button><button class="btn s" onclick="csv()">Download all records (CSV)</button><div class="msg" id="msg"></div></div>`;
+ const up=()=>{S.day=$('#day').value;S.to=$('#to').value;S.cat=$('#cat').value;save();$('#sum').value=S.cat==='x'?xsum(S.day):summary(S.day)};
+ $('#cat').value=S.cat||'h';$('#cat').onchange=up;$('#day').onchange=up;$('#to').oninput=up;up()}
+function mail(){const to=$('#to').value.trim(),sub=(S.cat==='x'?'EXPENSES ':'HACCP records ')+$('#day').value,b=$('#sum').value,m=$('#msg');
+ if(!to){m.style.color='var(--bad)';m.textContent='Enter the records inbox address first.';return}
+ let u='mailto:'+to+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(b);
+ if(u.length>1900)u=u.split('&body=')[0];
+ copy(true);location.href=u;
+ m.style.color='var(--mu)';m.innerHTML='If your mail app didn’t open, the summary is copied. Paste it into a new email to <b>'+e(to)+'</b> with subject <b>'+e(sub)+'</b>.'}
+async function copy(quiet){const t=$('#sum');let ok=false;try{await navigator.clipboard.writeText(t.value);ok=true}catch(_){try{t.select();ok=document.execCommand('copy')}catch(_){}}
+ if(!quiet){$('#msg').style.color='var(--ok)';$('#msg').textContent=ok?'Copied.':'Select the text above and copy it manually.'}}
+async function csv(){if(S.cat==='x')return xcsv();const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';let o='log,date,time,batch,details,flag\n';
+ rows.slice().sort((a,b)=>a.ts-b.ts).forEach(r=>{const L=LOGS.find(x=>x.id===r.log);if(!L)return;o+=[L.t,r.date,r.time,r.batch,L.f.filter(f=>!['date','time','batch'].includes(f[0])&&r[f[0]]).map(f=>f[1]+': '+r[f[0]]).join('; '),flags(L,r).join(', ')].map(q).join(',')+'\n'});
+ dl('haccp-records.csv',o)}
+const CATS=['Ingredients & produce','Packaging (bottles, caps, labels)','Equipment','Sanitation & supplies','Licenses & fees','Marketing','Utilities & rent','Other'];
+const X={blob:null};
+function shrink(f){return new Promise((ok,no)=>{const fr=new FileReader();fr.onerror=no;fr.onload=()=>{const i=new Image();i.onerror=no;i.onload=()=>{const k=Math.min(1,1600/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);c.getContext('2d').drawImage(i,0,0,c.width,c.height);c.toBlob(b=>b?ok({blob:b,url:c.toDataURL('image/jpeg',.7)}):no(),'image/jpeg',.8)};i.src=fr.result};fr.readAsDataURL(f)})}
+const money=n=>'$'+(+n||0).toFixed(2);
+function exp(v){const list=rows.filter(r=>r.log==='exp').sort((a,b)=>b.ts-a.ts),mo=today().slice(0,7),mt=list.filter(r=>(r.date||'').startsWith(mo)).reduce((t,r)=>t+(+r.total||0),0);
+ v.innerHTML=`<div class="card"><h2>Add a receipt</h2><label for="rf">Take or choose a photo</label><input id="rf" type="file" accept="image/*" capture="environment"><img id="pv" class="pv" hidden><div class="msg" id="rm"></div>
+ ${fld(['date','Date','date'])}${fld(['vendor','Vendor','text'])}${fld(['total','Total ($)','number',{step:.01}])}${fld(['tax','Tax ($)','number',{step:.01}])}
+ <label for="f_cat">Category</label><select id="f_cat">${CATS.map(c=>`<option>${e(c)}</option>`).join('')}</select>
+ <label for="f_pay">Payment</label><select id="f_pay"><option>Card</option><option>Cash</option><option>Other</option></select>
+ ${fld(['items','Items / description','textarea'])}${fld(['note','Notes','text'])}${fld(['by','Entered by','text'])}
+ <button class="btn" onclick="saveExp()">Save receipt</button><div class="msg" id="msg"></div></div>
+ <div class="card"><h2>Recent receipts</h2><div class="mu">This month: <b>${money(mt)}</b></div>${list.slice(0,30).map(r=>`<div class="row">${r.img&&urls[r.img]?`<img class="th" src="${e(urls[r.img])}" alt="receipt">`:''}<b>${e(r.date)}</b> ${e(r.vendor)} · ${money(r.total)}<br><span class="mu">${e(r.cat)}${r.items?' · '+e(r.items):''}</span></div>`).join('')||'<div class="mu">No receipts yet.</div>'}</div>`;
+ $('#rf').onchange=async ev=>{const f=ev.target.files[0],m=$('#rm');if(!f)return;m.style.color='var(--mu)';m.textContent='Preparing photo…';
+  try{const o=await shrink(f);X.blob=o.blob;$('#pv').src=o.url;$('#pv').hidden=false;m.textContent='Photo attached. Fill in the details below.'}catch(_){m.textContent='Could not open that photo.'}}}
+async function saveExp(){const m=$('#msg'),r={};['date','vendor','total','tax','items','note','by','cat','pay'].forEach(k=>r[k]=($('#f_'+k).value||'').trim());
+ if(!r.date||!r.vendor||!(+r.total)){m.style.color='var(--bad)';m.textContent='Date, vendor and total are required.';return}
+ if(r.by){S.name=r.by;save()}
+ try{let img=null;if(X.blob){img=(crypto.randomUUID?crypto.randomUUID():String(Date.now()))+'.jpg';const{error}=await sb.storage.from('receipts').upload(img,X.blob,{contentType:'image/jpeg'});if(error)throw error}
+  await add('exp',r,img);X.blob=null;render();$('#msg').style.color='var(--ok)';$('#msg').textContent='Saved.'}
+ catch(x){m.style.color='var(--bad)';m.textContent='Could not save: '+(x.message||x.code)}}
+function xrows(day){const mo=day.slice(0,7);return rows.filter(r=>r.log==='exp'&&(r.date||'').startsWith(mo)).sort((a,b)=>(a.date>b.date?1:-1))}
+function xsum(day){const l=xrows(day);let o=`TIGER TONIC EXPENSE SUMMARY\nMonth: ${day.slice(0,7)}\n\n`;if(!l.length)return o+'No receipts logged for this month.\n';
+ const bc={};let t=0,tx=0;l.forEach(r=>{o+=`- ${r.date} ${r.vendor} | ${r.cat} | ${money(r.total)} (tax ${money(r.tax)}) | ${r.pay||''}${r.items?' | '+r.items:''}${r.note?' | Note: '+r.note:''}\n`;bc[r.cat]=(bc[r.cat]||0)+(+r.total||0);t+=+r.total||0;tx+=+r.tax||0});
+ o+='\nBY CATEGORY\n';Object.keys(bc).forEach(c=>o+=`${c}: ${money(bc[c])}\n`);return o+`\nTOTAL: ${money(t)} (tax ${money(tx)}), ${l.length} receipts\n`}
+async function xcsv(){const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';let o='date,vendor,category,total,tax,payment,items,notes,entered by\n';
+ rows.filter(r=>r.log==='exp').sort((a,b)=>(a.date>b.date?1:-1)).forEach(r=>o+=[r.date,r.vendor,r.cat,r.total,r.tax,r.pay,r.items,r.note,r.by].map(q).join(',')+'\n');
+ dl('expenses.csv',o)}
+function dl(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
+async function load(){let all=[];for(let from=0;;from+=1000){const{data,error}=await sb.from('entries').select('created_at,log,data,img').order('created_at',{ascending:true}).range(from,from+999);if(error)throw error;all=all.concat(data);if(data.length<1000)break}
+ rows=all.map(d=>({...d.data,log:d.log,img:d.img,ts:Date.parse(d.created_at)}));
+ const ps=[...new Set(rows.filter(r=>r.img).map(r=>r.img))].filter(p=>!urls[p]);
+ for(let i=0;i<ps.length;i+=100){const{data:s}=await sb.storage.from('receipts').createSignedUrls(ps.slice(i,i+100),3600);(s||[]).forEach(x=>{if(x.signedUrl)urls[x.path]=x.signedUrl})}}
+async function add(log,r,img){const d={...r};delete d.log;delete d.ts;delete d.img;const{error}=await sb.from('entries').insert({log,data:d,img:img||null});if(error)throw error;await load()}
+function loginView(){$('#nav').innerHTML='';$('#mode').textContent='';$('#view').innerHTML=`<div class="card"><h2>Sign in</h2><label for="em">Email</label><input id="em" type="email" autocomplete="username"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password"><button class="btn" onclick="signIn()">Sign in</button><div class="msg" id="msg" style="color:var(--bad)"></div></div>`;$('#pw').onkeydown=ev=>{if(ev.key==='Enter')signIn()}}
+async function signIn(){$('#msg').textContent='';const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error)$('#msg').textContent=error.message}
+async function signOut(){await sb.auth.signOut()}
+const busy=()=>document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+if(!window.supabase||SUPABASE_URL.includes('PASTE')){$('#view').innerHTML='<div class="card"><h2>Setup needed</h2><div class="mu">Put your Supabase project URL and public key at the top of index.html (SUPABASE_URL and SUPABASE_KEY), then reload.</div></div>'}
+else{$('#view').innerHTML='<div class="mu">Loading…</div>';sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+ sb.auth.onAuthStateChange((ev,session)=>{const nu=session?session.user:null;if(nu&&user&&nu.id===user.id){user=nu;return}user=nu;
+  setTimeout(async()=>{if(user){try{await load()}catch(x){$('#view').innerHTML='<div class="card"><h2>Could not load records</h2><div class="mu">'+e(x.message||x.code)+'</div></div>';return}}else{rows=[];urls={}}render()},0)});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden||!user)return;setTimeout(async()=>{try{await load();if(!busy()&&!X.blob)render()}catch(_){}},0)})}
+</script></body></html>
